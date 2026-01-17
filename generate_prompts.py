@@ -13,6 +13,8 @@ from src.openai_client import DEFAULT_INSTRUCTIONS, OpenAIClient, OpenAIClientCo
 from src.output import CsvWriterConfig, write_csv, write_jsonl
 from src.parser import Paragraph, parse_numbered_paragraphs
 
+__version__ = "0.1.0"
+
 
 @dataclass(frozen=True, slots=True)
 class Args:
@@ -35,6 +37,7 @@ class Args:
     format: str
     encoding: str
     jsonl: Path | None
+    include_meta: bool
 
     dry_run: bool
     print_instructions: bool
@@ -47,6 +50,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "Generate 1 English cinematic video prompt per numbered paragraph "
             "and export results to CSV."
         ),
+    )
+
+    _ = parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
 
     _ = parser.add_argument(
@@ -132,6 +141,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional JSONL output path (writes one JSON object per row).",
     )
+    _ = parser.add_argument(
+        "--include-meta",
+        action="store_true",
+        help="Include metadata columns: model, response_id, timestamp.",
+    )
 
     _ = parser.add_argument(
         "--dry-run",
@@ -200,6 +214,7 @@ def parse_cli_args() -> Args:
         format=cast(str, ns.format),
         encoding=cast(str, ns.encoding),
         jsonl=cast(Path | None, ns.jsonl),
+        include_meta=cast(bool, ns.include_meta),
         dry_run=cast(bool, ns.dry_run),
         print_instructions=cast(bool, ns.print_instructions),
     )
@@ -208,63 +223,40 @@ def parse_cli_args() -> Args:
 def main() -> int:
     _ = load_dotenv(dotenv_path=Path(".env"), override=False)
 
-    args: Args = parse_cli_args()
-
-    input_path = args.input
-    output_path = args.output
-
-    env_model = os.environ.get("OPENAI_MODEL")
-    env_base_url = os.environ.get("OPENAI_BASE_URL")
-    env_api_mode = os.environ.get("OPENAI_API_MODE")
-
-    model = args.model or env_model or "gpt-4o-mini"
-    base_url = args.base_url or env_base_url
-    api_mode = args.api_mode or env_api_mode or "responses"
-    store = args.store
-    temperature = args.temperature
-    max_output_tokens = args.max_output_tokens
-
-    start = args.start
-    end = args.end
-    ids = args.ids
-    limit = args.limit
-
-    append = args.append
-    format_name = args.format
-    encoding = args.encoding
-    jsonl_path = args.jsonl
-
-    dry_run = args.dry_run
-    print_instructions = args.print_instructions
+    args = parse_cli_args()
 
     try:
-        if print_instructions:
+        if args.print_instructions:
             print(DEFAULT_INSTRUCTIONS)
             return 0
 
-        text = input_path.read_text(encoding="utf-8")
+        model = args.model or os.environ.get("OPENAI_MODEL") or "gpt-4o-mini"
+        base_url = args.base_url or os.environ.get("OPENAI_BASE_URL")
+        api_mode = args.api_mode or os.environ.get("OPENAI_API_MODE") or "responses"
+
+        text = args.input.read_text(encoding="utf-8")
         paragraphs = parse_numbered_paragraphs(text)
         selected = select_paragraphs(
             paragraphs,
-            ids_csv=ids,
-            start=start,
-            end=end,
-            limit=limit,
+            ids_csv=args.ids,
+            start=args.start,
+            end=args.end,
+            limit=args.limit,
         )
 
         total = len(selected)
         print(f"processing {total} paragraph(s)", file=sys.stderr)
 
-        if dry_run:
+        if args.dry_run:
             print("dry-run: skipping model calls and output writes", file=sys.stderr)
             return 0
 
         client = OpenAIClient(
             OpenAIClientConfig(
                 model=model,
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-                store=store,
+                temperature=args.temperature,
+                max_output_tokens=args.max_output_tokens,
+                store=args.store,
                 base_url=base_url,
                 api_mode=api_mode,
             )
@@ -276,22 +268,36 @@ def main() -> int:
                 f"[{i}/{total}] generating prompt for paragraph {p.id}...",
                 file=sys.stderr,
             )
-            prompt = client.generate_prompt(paragraph_id=p.id, paragraph_text=p.text)
-            rows.append({"id": str(p.id), "paragraph": p.text, "prompt": prompt})
+            result = client.generate_prompt(paragraph_id=p.id, paragraph_text=p.text)
+            row: dict[str, str] = {
+                "id": str(p.id),
+                "paragraph": p.text,
+                "prompt": result.prompt,
+            }
+            if args.include_meta:
+                row["model"] = result.model
+                row["response_id"] = result.response_id
+                row["timestamp"] = result.timestamp
+            rows.append(row)
 
         print(f"generated {len(rows)} prompt(s)", file=sys.stderr)
 
-        delimiter = "\t" if format_name == "tsv" else ","
+        delimiter = "\t" if args.format == "tsv" else ","
         write_csv(
             rows,
-            output_path,
-            CsvWriterConfig(append=append, encoding=encoding, delimiter=delimiter),
+            args.output,
+            CsvWriterConfig(
+                append=args.append,
+                encoding=args.encoding,
+                delimiter=delimiter,
+                include_meta=args.include_meta,
+            ),
         )
-        print(f"wrote {output_path}", file=sys.stderr)
+        print(f"wrote {args.output}", file=sys.stderr)
 
-        if jsonl_path is not None:
-            write_jsonl(rows, jsonl_path, append=append, encoding=encoding)
-            print(f"wrote {jsonl_path}", file=sys.stderr)
+        if args.jsonl is not None:
+            write_jsonl(rows, args.jsonl, append=args.append, encoding=args.encoding)
+            print(f"wrote {args.jsonl}", file=sys.stderr)
 
         return 0
     except Exception as e:
