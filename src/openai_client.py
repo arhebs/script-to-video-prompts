@@ -110,6 +110,6 @@ class OpenAIClient:
         return self.normalize(output_text)
 
     def normalize(self, text: str) -> str:
-        if not isinstance(text, str) or not text.strip():
+        if not text.strip():
             raise ValueError("Empty model output")
         return normalize_prompt(text)

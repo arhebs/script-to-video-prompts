@@ -46,4 +46,4 @@ def write_jsonl(
                 "paragraph": row.get("paragraph", ""),
                 "prompt": row.get("prompt", ""),
             }
-            f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+            _ = f.write(json.dumps(obj, ensure_ascii=False) + "\n")

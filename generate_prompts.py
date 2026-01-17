@@ -206,7 +206,7 @@ def parse_cli_args() -> Args:
 
 
 def main() -> int:
-    load_dotenv(dotenv_path=Path(".env"), override=False)
+    _ = load_dotenv(dotenv_path=Path(".env"), override=False)
 
     args: Args = parse_cli_args()
 
