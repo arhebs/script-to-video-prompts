@@ -85,8 +85,13 @@ def select_paragraphs(
     end: int | None,
     limit: int | None,
 ) -> list[Paragraph]:
-    if ids_csv:
-        wanted = {int(x.strip()) for x in ids_csv.split(",") if x.strip()}
+    if ids_csv is not None:
+        raw_parts = [p.strip() for p in ids_csv.split(",")]
+        parts = [p for p in raw_parts if p]
+        try:
+            wanted = {int(p) for p in parts}
+        except ValueError as e:
+            raise ValueError("--ids must be a comma-separated list of integers") from e
         return [p for p in paragraphs if p.id in wanted]
 
     selected = paragraphs
