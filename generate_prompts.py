@@ -12,13 +12,18 @@ from dotenv import load_dotenv
 from src.openai_client import DEFAULT_INSTRUCTIONS, OpenAIClient, OpenAIClientConfig
 from src.output import CsvWriterConfig, write_csv, write_jsonl
 from src.parser import Paragraph, parse_numbered_paragraphs
+from src.docx_reader import read_docx_text
+from src.yandex_docx import download_public_file
+
+import tempfile
 
 __version__ = "0.1.0"
 
 
 @dataclass(frozen=True, slots=True)
 class Args:
-    input: Path
+    input: Path | None
+    yandex_url: str | None
     output: Path
 
     model: str | None
@@ -58,11 +63,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         version=f"%(prog)s {__version__}",
     )
 
-    _ = parser.add_argument(
+    group = parser.add_mutually_exclusive_group(required=True)
+    _ = group.add_argument(
         "--input",
-        required=True,
         type=Path,
-        help="Path to input script file (UTF-8 text).",
+        help="Path to input script file (.txt or .docx).",
+    )
+    _ = group.add_argument(
+        "--yandex-url",
+        dest="yandex_url",
+        help="Yandex Disk public URL to download (.docx).",
     )
     _ = parser.add_argument(
         "--output",
@@ -198,7 +208,8 @@ def select_paragraphs(
 def parse_cli_args() -> Args:
     ns = build_arg_parser().parse_args()
     return Args(
-        input=cast(Path, ns.input),
+        input=cast(Path | None, ns.input),
+        yandex_url=cast(str | None, ns.yandex_url),
         output=cast(Path, ns.output),
         model=cast(str | None, ns.model),
         base_url=cast(str | None, ns.base_url),
@@ -220,6 +231,22 @@ def parse_cli_args() -> Args:
     )
 
 
+def read_input_text(args: Args) -> str:
+    if args.input is not None:
+        suffix = args.input.suffix.lower()
+        if suffix == ".docx":
+            return read_docx_text(args.input)
+        return args.input.read_text(encoding="utf-8")
+
+    if args.yandex_url is None:
+        raise ValueError("Either --input or --yandex-url is required")
+
+    with tempfile.TemporaryDirectory() as td:
+        dest = Path(td) / "input.docx"
+        download_public_file(args.yandex_url, dest)
+        return read_docx_text(dest)
+
+
 def main() -> int:
     _ = load_dotenv(dotenv_path=Path(".env"), override=False)
 
@@ -234,7 +261,7 @@ def main() -> int:
         base_url = args.base_url or os.environ.get("OPENAI_BASE_URL")
         api_mode = args.api_mode or os.environ.get("OPENAI_API_MODE") or "responses"
 
-        text = args.input.read_text(encoding="utf-8")
+        text = read_input_text(args)
         paragraphs = parse_numbered_paragraphs(text)
         selected = select_paragraphs(
             paragraphs,
