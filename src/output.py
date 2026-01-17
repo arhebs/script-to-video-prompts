@@ -9,6 +9,7 @@ from pathlib import Path
 class CsvWriterConfig:
     append: bool = False
     encoding: str = "utf-8"
+    delimiter: str = ","
 
 
 def write_csv(rows: list[dict[str, str]], path: Path, config: CsvWriterConfig) -> None:
@@ -20,7 +21,7 @@ def write_csv(rows: list[dict[str, str]], path: Path, config: CsvWriterConfig) -
     file_exists = path.exists()
 
     with path.open(mode, newline="", encoding=config.encoding) as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=config.delimiter)
         if not config.append or not file_exists:
             writer.writeheader()
         for row in rows:

@@ -41,9 +41,23 @@ def test_write_csv_quotes_commas_and_quotes(tmp_path: Path) -> None:
     write_csv(
         [{"id": "1", "paragraph": "a, b", "prompt": 'say "hi"'}],
         out,
-        CsvWriterConfig(),
+        CsvWriterConfig(delimiter=","),
     )
 
     text = out.read_text(encoding="utf-8")
     assert '"a, b"' in text
     assert '"say ""hi"""' in text
+
+
+def test_write_tsv_uses_tab_delimiter(tmp_path: Path) -> None:
+    out = tmp_path / "out.tsv"
+
+    write_csv(
+        [{"id": "1", "paragraph": "a\tb", "prompt": "c"}],
+        out,
+        CsvWriterConfig(delimiter="\t"),
+    )
+
+    text = out.read_text(encoding="utf-8")
+    assert text.splitlines()[0] == "id\tparagraph\tprompt"
+    assert "\t" in text
