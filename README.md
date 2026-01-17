@@ -117,6 +117,7 @@ For best results, ensure the script paragraphs use Word's native numbering (not 
 
 - Rate limits (HTTP 429)
     - Fix: run in batches with `--start/--end` or smaller `--limit`, and use `--append` to build one CSV.
+    - Note: when using `--append`, keep output columns consistent across runs (e.g. don't toggle `--include-meta`).
 
 ## End-to-End Smoke Test (for demo)
 
@@ -130,13 +131,13 @@ Defaults (script-level):
 - `--out smoke_out.csv`
 - `--format csv`
 - `--include-meta` off
-- `--dry-run` off
+- `--dry-run` off (note: selection errors still exit non-zero)
 - `--max-output-tokens` not set (the script uses the CLI default unless you override it)
 
 How to override: pass flags to `smoke_test_yandex.py`.
 
 ```bash
-# Dry-run (parsing only; no model calls)
+# Dry-run (parsing/selection only; no model calls and no output writes)
 .venv/bin/python smoke_test_yandex.py \
   --yandex-url "https://disk.yandex.ru/i/UEBvT8gBETe8Kg" \
   --dry-run
