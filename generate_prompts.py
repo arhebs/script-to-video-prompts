@@ -70,6 +70,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Append to output file if it exists (write header only once).",
     )
     parser.add_argument(
+        "--format",
+        choices=["csv", "tsv"],
+        default="csv",
+        help="Output format.",
+    )
+    parser.add_argument(
         "--encoding",
         default="utf-8",
         help="Output encoding (e.g. utf-8-sig).",
@@ -129,6 +135,7 @@ def main() -> int:
     limit: int | None = args.limit
 
     append: bool = args.append
+    format_name: str = args.format
     encoding: str = args.encoding
 
     try:
@@ -156,10 +163,11 @@ def main() -> int:
             prompt = client.generate_prompt(paragraph_id=p.id, paragraph_text=p.text)
             rows.append({"id": str(p.id), "paragraph": p.text, "prompt": prompt})
 
+        delimiter = "\t" if format_name == "tsv" else ","
         write_csv(
             rows,
             output_path,
-            CsvWriterConfig(append=append, encoding=encoding),
+            CsvWriterConfig(append=append, encoding=encoding, delimiter=delimiter),
         )
 
         return 0
