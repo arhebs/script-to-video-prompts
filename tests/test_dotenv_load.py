@@ -16,6 +16,10 @@ def test_dotenv_is_loaded(tmp_path: Path, monkeypatch) -> None:
         encoding="utf-8",
     )
 
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.delenv("OPENAI_API_MODE", raising=False)
+
     monkeypatch.chdir(tmp_path)
 
     from src.openai_client import OpenAIClient

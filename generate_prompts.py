@@ -143,7 +143,7 @@ def select_paragraphs(
 
 
 def main() -> int:
-    load_dotenv(override=False)
+    load_dotenv(dotenv_path=Path(".env"), override=False)
 
     args = build_arg_parser().parse_args()
 
@@ -193,10 +193,19 @@ def main() -> int:
             )
         )
 
+        total = len(selected)
+        print(f"processing {total} paragraph(s)", file=sys.stderr)
+
         rows: list[dict[str, str]] = []
-        for p in selected:
+        for i, p in enumerate(selected, start=1):
+            print(
+                f"[{i}/{total}] generating prompt for paragraph {p.id}...",
+                file=sys.stderr,
+            )
             prompt = client.generate_prompt(paragraph_id=p.id, paragraph_text=p.text)
             rows.append({"id": str(p.id), "paragraph": p.text, "prompt": prompt})
+
+        print(f"generated {len(rows)} prompt(s)", file=sys.stderr)
 
         delimiter = "\t" if format_name == "tsv" else ","
         write_csv(
@@ -204,9 +213,11 @@ def main() -> int:
             output_path,
             CsvWriterConfig(append=append, encoding=encoding, delimiter=delimiter),
         )
+        print(f"wrote {output_path}", file=sys.stderr)
 
         if jsonl_path is not None:
             write_jsonl(rows, jsonl_path, append=append, encoding=encoding)
+            print(f"wrote {jsonl_path}", file=sys.stderr)
 
         return 0
     except Exception as e:
