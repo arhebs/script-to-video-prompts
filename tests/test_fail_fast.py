@@ -35,4 +35,7 @@ def test_cli_fail_fast_on_openai_error(tmp_path: Path, monkeypatch) -> None:
 
     exit_code = main()
     assert exit_code == 1
-    assert not out.exists()
+    assert out.exists()
+
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "id,paragraph,prompt"

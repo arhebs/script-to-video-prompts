@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import os
 import sys
 import tempfile
@@ -12,7 +14,7 @@ from dotenv import load_dotenv
 
 from src.docx_reader import read_docx_text
 from src.openai_client import DEFAULT_INSTRUCTIONS, OpenAIClient, OpenAIClientConfig
-from src.output import CsvWriterConfig, write_csv, write_jsonl
+
 from src.parser import Paragraph, parse_numbered_paragraphs
 from src.yandex_docx import download_public_file
 
@@ -273,6 +275,22 @@ def main() -> int:
         total = len(selected)
         print(f"processing {total} paragraph(s)", file=sys.stderr)
 
+        if total == 0:
+            if args.ids is not None:
+                available = ",".join(str(p.id) for p in paragraphs)
+                print(
+                    "warning: no paragraphs selected; check --ids or input numbering",
+                    file=sys.stderr,
+                )
+                print(f"requested ids: {args.ids}", file=sys.stderr)
+                print(f"available ids: {available}", file=sys.stderr)
+            else:
+                print(
+                    "warning: no paragraphs selected; check --start/--end/--limit",
+                    file=sys.stderr,
+                )
+            return 1
+
         if args.dry_run:
             print("dry-run: skipping model calls and output writes", file=sys.stderr)
             return 0
@@ -288,44 +306,92 @@ def main() -> int:
             )
         )
 
-        rows: list[dict[str, str]] = []
-        for i, p in enumerate(selected, start=1):
-            print(
-                f"[{i}/{total}] generating prompt for paragraph {p.id}...",
-                file=sys.stderr,
-            )
-            result = client.generate_prompt(paragraph_id=p.id, paragraph_text=p.text)
-            row: dict[str, str] = {
-                "id": str(p.id),
-                "paragraph": p.text,
-                "prompt": result.prompt,
-            }
-            if args.include_meta:
-                row["model"] = result.model
-                row["response_id"] = result.response_id
-                row["timestamp"] = result.timestamp
-            rows.append(row)
-
-        print(f"generated {len(rows)} prompt(s)", file=sys.stderr)
-
         delimiter = "\t" if args.format == "tsv" else ","
-        write_csv(
-            rows,
-            args.output,
-            CsvWriterConfig(
-                append=args.append,
-                encoding=args.encoding,
-                delimiter=delimiter,
-                include_meta=args.include_meta,
-            ),
-        )
-        print(f"wrote {args.output}", file=sys.stderr)
+        fieldnames = ["id", "paragraph", "prompt"]
+        if args.include_meta:
+            fieldnames += ["model", "response_id", "timestamp"]
 
+        output_mode = "a" if args.append else "w"
+        file_exists = args.output.exists()
+        file_size = args.output.stat().st_size if file_exists else 0
+
+        if args.append and file_exists and file_size > 0:
+            with args.output.open("r", newline="", encoding=args.encoding) as rf:
+                reader = csv.reader(rf, delimiter=delimiter)
+                try:
+                    existing_header = next(reader)
+                except StopIteration:
+                    existing_header = []
+
+            if existing_header != fieldnames:
+                print(
+                    f"error: header mismatch in {args.output} during --append",
+                    file=sys.stderr,
+                )
+                print(f"error: existing header: {existing_header}", file=sys.stderr)
+                print(f"error: expected header: {fieldnames}", file=sys.stderr)
+                print(
+                    "error: resolution: use consistent flags (e.g. --include-meta), a new --output path, or omit --append to overwrite",
+                    file=sys.stderr,
+                )
+                return 1
+
+        write_header = (not args.append) or (
+            args.append and (not file_exists or file_size == 0)
+        )
+
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        with args.output.open(output_mode, newline="", encoding=args.encoding) as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=delimiter)
+            if write_header:
+                writer.writeheader()
+                f.flush()
+
+            jsonl_f = None
+            if args.jsonl is not None:
+                jsonl_mode = "a" if args.append else "w"
+                args.jsonl.parent.mkdir(parents=True, exist_ok=True)
+                jsonl_f = args.jsonl.open(jsonl_mode, encoding=args.encoding)
+
+            wrote = 0
+            try:
+                for i, p in enumerate(selected, start=1):
+                    print(
+                        f"[{i}/{total}] generating prompt for paragraph {p.id}...",
+                        file=sys.stderr,
+                    )
+                    result = client.generate_prompt(
+                        paragraph_id=p.id, paragraph_text=p.text
+                    )
+
+                    row: dict[str, str] = {
+                        "id": str(p.id),
+                        "paragraph": p.text,
+                        "prompt": result.prompt,
+                    }
+                    if args.include_meta:
+                        row["model"] = result.model
+                        row["response_id"] = result.response_id
+                        row["timestamp"] = result.timestamp
+
+                    writer.writerow({k: row.get(k, "") for k in fieldnames})
+                    f.flush()
+                    wrote += 1
+
+                    if jsonl_f is not None:
+                        _ = jsonl_f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                        jsonl_f.flush()
+            finally:
+                if jsonl_f is not None:
+                    jsonl_f.close()
+
+        print(f"generated {wrote} prompt(s)", file=sys.stderr)
+        print(f"wrote {args.output}", file=sys.stderr)
         if args.jsonl is not None:
-            write_jsonl(rows, args.jsonl, append=args.append, encoding=args.encoding)
             print(f"wrote {args.jsonl}", file=sys.stderr)
 
         return 0
+
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
