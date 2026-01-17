@@ -1,0 +1,18 @@
+[project]
+name = "script-to-video-prompts"
+version = "0.1.0"
+description = "Numbered script -> cinematic prompts -> CSV"
+requires-python = ">=3.12"
+dependencies = [
+  "openai>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
