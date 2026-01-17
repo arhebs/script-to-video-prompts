@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
 from src.openai_client import OpenAIClient, OpenAIClientConfig
 from src.output import CsvWriterConfig, write_csv
@@ -130,37 +131,41 @@ def main() -> int:
     append: bool = args.append
     encoding: str = args.encoding
 
-    text = input_path.read_text(encoding="utf-8")
-    paragraphs = parse_numbered_paragraphs(text)
-    selected = select_paragraphs(
-        paragraphs,
-        ids_csv=ids,
-        start=start,
-        end=end,
-        limit=limit,
-    )
-
-    client = OpenAIClient(
-        OpenAIClientConfig(
-            model=model,
-            temperature=temperature,
-            max_output_tokens=max_output_tokens,
-            store=store,
+    try:
+        text = input_path.read_text(encoding="utf-8")
+        paragraphs = parse_numbered_paragraphs(text)
+        selected = select_paragraphs(
+            paragraphs,
+            ids_csv=ids,
+            start=start,
+            end=end,
+            limit=limit,
         )
-    )
 
-    rows: list[dict[str, str]] = []
-    for p in selected:
-        prompt = client.generate_prompt(paragraph_id=p.id, paragraph_text=p.text)
-        rows.append({"id": str(p.id), "paragraph": p.text, "prompt": prompt})
+        client = OpenAIClient(
+            OpenAIClientConfig(
+                model=model,
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+                store=store,
+            )
+        )
 
-    write_csv(
-        rows,
-        output_path,
-        CsvWriterConfig(append=append, encoding=encoding),
-    )
+        rows: list[dict[str, str]] = []
+        for p in selected:
+            prompt = client.generate_prompt(paragraph_id=p.id, paragraph_text=p.text)
+            rows.append({"id": str(p.id), "paragraph": p.text, "prompt": prompt})
 
-    return 0
+        write_csv(
+            rows,
+            output_path,
+            CsvWriterConfig(append=append, encoding=encoding),
+        )
+
+        return 0
+    except Exception as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
