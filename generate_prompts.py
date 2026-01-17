@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
+
+from dotenv import load_dotenv
 
 from src.openai_client import OpenAIClient, OpenAIClientConfig
 from src.output import CsvWriterConfig, write_csv, write_jsonl
@@ -31,7 +34,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Path to output CSV.",
     )
 
-    parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI model name.")
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Model name (defaults to env OPENAI_MODEL or gpt-4o-mini).",
+    )
+    parser.add_argument(
+        "--base-url",
+        default=None,
+        help="OpenAI-compatible base URL (defaults to env OPENAI_BASE_URL).",
+    )
+    parser.add_argument(
+        "--api-mode",
+        choices=["responses", "chat"],
+        default=None,
+        help="API mode (defaults to env OPENAI_API_MODE or responses).",
+    )
     parser.add_argument(
         "--store",
         action="store_true",
@@ -125,12 +143,20 @@ def select_paragraphs(
 
 
 def main() -> int:
+    load_dotenv(override=False)
+
     args = build_arg_parser().parse_args()
 
     input_path: Path = args.input
     output_path: Path = args.output
 
-    model: str = args.model
+    env_model = os.environ.get("OPENAI_MODEL")
+    env_base_url = os.environ.get("OPENAI_BASE_URL")
+    env_api_mode = os.environ.get("OPENAI_API_MODE")
+
+    model: str = args.model or env_model or "gpt-4o-mini"
+    base_url: str | None = args.base_url or env_base_url
+    api_mode: str = args.api_mode or env_api_mode or "responses"
     store: bool = args.store
     temperature: float = args.temperature
     max_output_tokens: int = args.max_output_tokens
@@ -162,6 +188,8 @@ def main() -> int:
                 temperature=temperature,
                 max_output_tokens=max_output_tokens,
                 store=store,
+                base_url=base_url,
+                api_mode=api_mode,
             )
         )
 

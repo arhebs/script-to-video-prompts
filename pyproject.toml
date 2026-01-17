@@ -5,6 +5,7 @@ description = "Numbered script -> cinematic prompts -> CSV"
 requires-python = ">=3.12"
 dependencies = [
   "openai>=1.0.0",
+  "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
