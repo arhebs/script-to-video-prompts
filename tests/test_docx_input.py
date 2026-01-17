@@ -12,9 +12,13 @@ def test_docx_input_uses_docx_reader(tmp_path: Path, monkeypatch) -> None:
 
     inp.write_bytes(b"fake-docx")
 
+    def fake_read_docx_text(path: Path) -> str:
+        assert path == inp
+        return "1. Hello\n"
+
     monkeypatch.setattr(
         "generate_prompts.read_docx_text",
-        lambda path: "1. Hello\n",
+        fake_read_docx_text,
     )
 
     from src.openai_client import OpenAIClient

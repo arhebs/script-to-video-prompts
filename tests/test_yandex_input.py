@@ -14,7 +14,12 @@ def test_yandex_url_downloads_and_reads_docx(tmp_path: Path, monkeypatch) -> Non
         dest.write_bytes(b"fake-docx")
 
     monkeypatch.setattr("generate_prompts.download_public_file", fake_download)
-    monkeypatch.setattr("generate_prompts.read_docx_text", lambda path: "1. Hello\n")
+
+    def fake_read_docx_text(path: Path) -> str:
+        assert path.read_bytes() == b"fake-docx"
+        return "1. Hello\n"
+
+    monkeypatch.setattr("generate_prompts.read_docx_text", fake_read_docx_text)
 
     from src.openai_client import OpenAIClient
 
