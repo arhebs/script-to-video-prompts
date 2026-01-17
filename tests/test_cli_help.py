@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from generate_prompts import build_arg_parser, __version__
+from generate_prompts import __version__, build_arg_parser
 
 
 def test_help_runs_without_error(capsys) -> None:

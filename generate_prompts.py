@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import os
-from pathlib import Path
 import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
 from typing import cast
 
 from dotenv import load_dotenv
 
+from src.docx_reader import read_docx_text
 from src.openai_client import DEFAULT_INSTRUCTIONS, OpenAIClient, OpenAIClientConfig
 from src.output import CsvWriterConfig, write_csv, write_jsonl
 from src.parser import Paragraph, parse_numbered_paragraphs
-from src.docx_reader import read_docx_text
 from src.yandex_docx import download_public_file
-
-import tempfile
 
 __version__ = "0.1.0"
 

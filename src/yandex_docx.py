@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import urllib.request
 from pathlib import Path
 from typing import IO, cast
 from urllib.parse import urlencode
-import urllib.request
 
 _YANDEX_PUBLIC_DOWNLOAD_ENDPOINT = (
     "https://cloud-api.yandex.net/v1/disk/public/resources/download"

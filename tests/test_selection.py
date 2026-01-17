@@ -1,7 +1,7 @@
 import pytest
 
-from src.parser import Paragraph
 from generate_prompts import select_paragraphs
+from src.parser import Paragraph
 
 
 def test_ids_precedence_over_range_and_limit() -> None:

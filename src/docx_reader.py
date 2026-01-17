@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
-from pathlib import Path
-from typing import Protocol, cast
 import importlib
 import xml.etree.ElementTree as ET
 import zipfile
-
+from collections.abc import Iterable, Sequence
+from pathlib import Path
+from typing import Protocol, cast
 
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _NS = {"w": _W_NS}

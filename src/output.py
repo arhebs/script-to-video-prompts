@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 _BASE_FIELDNAMES = ["id", "paragraph", "prompt"]

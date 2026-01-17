@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +48,8 @@ def parse_numbered_paragraphs(text: str) -> list[Paragraph]:
             if current_id is None:
                 if line.strip():
                     raise ValueError(
-                        f"Unexpected content before first paragraph header at line {idx}"
+                        f"Unexpected content before first paragraph header at line "
+                        f"{idx}"
                     )
                 continue
             current_parts.append(line)

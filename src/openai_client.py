@@ -31,8 +31,8 @@ class PromptResult:
 
 
 DEFAULT_INSTRUCTIONS = (
-    "You are a film director, anthropologist, and visual historian creating cinematic video prompts "
-    "for Google Veo 3 (fast mode). "
+    "You are a film director, anthropologist, and visual historian creating "
+    "cinematic video prompts for Google Veo 3 (fast mode). "
     "Generate exactly 1 prompt in English from the provided paragraph. "
     "Return exactly one prompt as a single block of text (no bullets, no line breaks). "
     "Do not include captions, on-screen text, watermarks, or logos."
