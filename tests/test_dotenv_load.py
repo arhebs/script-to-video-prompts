@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from generate_prompts import main
+from src.openai_client import PromptResult
 
 
 def test_dotenv_is_loaded(tmp_path: Path, monkeypatch) -> None:
@@ -24,13 +25,17 @@ def test_dotenv_is_loaded(tmp_path: Path, monkeypatch) -> None:
 
     from src.openai_client import OpenAIClient
 
-    def fake_generate_prompt(self, *, paragraph_id: int, paragraph_text: str) -> str:
+    def fake_generate_prompt(
+        self, *, paragraph_id: int, paragraph_text: str
+    ) -> PromptResult:
         assert self.config.model == "qwen-3-32b"
         assert self.config.base_url == "https://api.cerebras.ai/v1"
         assert self.config.api_mode == "chat"
         _ = paragraph_id
         _ = paragraph_text
-        return "ok"
+        return PromptResult(
+            prompt="ok", model="qwen-3-32b", response_id="r1", timestamp="t1"
+        )
 
     monkeypatch.setattr(OpenAIClient, "generate_prompt", fake_generate_prompt)
 

@@ -1,4 +1,5 @@
 from generate_prompts import main
+from src.openai_client import PromptResult
 
 
 def test_model_defaults_to_env(tmp_path, monkeypatch) -> None:
@@ -13,13 +14,17 @@ def test_model_defaults_to_env(tmp_path, monkeypatch) -> None:
 
     from src.openai_client import OpenAIClient
 
-    def fake_generate_prompt(self, *, paragraph_id: int, paragraph_text: str) -> str:
+    def fake_generate_prompt(
+        self, *, paragraph_id: int, paragraph_text: str
+    ) -> PromptResult:
         assert paragraph_id == 1
         assert paragraph_text == "Hello"
         assert self.config.model == "qwen-3-32b"
         assert self.config.base_url == "https://api.cerebras.ai/v1"
         assert self.config.api_mode == "chat"
-        return "ok"
+        return PromptResult(
+            prompt="ok", model="qwen-3-32b", response_id="r1", timestamp="t1"
+        )
 
     monkeypatch.setattr(OpenAIClient, "generate_prompt", fake_generate_prompt)
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from openai import OpenAI
 
@@ -22,6 +22,14 @@ class OpenAIClientConfig:
     max_retries: int = 5
 
 
+@dataclass(frozen=True, slots=True)
+class PromptResult:
+    prompt: str
+    model: str
+    response_id: str
+    timestamp: str
+
+
 DEFAULT_INSTRUCTIONS = (
     "You are a film director, anthropologist, and visual historian creating cinematic video prompts "
     "for Google Veo 3 (fast mode). "
@@ -36,14 +44,23 @@ def build_input(*, paragraph_id: int, paragraph_text: str) -> str:
     return f"Paragraph {paragraph_id}: {paragraph_text}"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class OpenAIClient:
     config: OpenAIClientConfig
+    _client: OpenAI | None = field(default=None, repr=False)
 
-    _responses_create: Callable[..., object] | None = None
-    _chat_create: Callable[..., str] | None = None
+    def _get_client(self) -> OpenAI:
+        if self._client is None:
+            self._client = OpenAI(
+                timeout=self.config.timeout_seconds,
+                max_retries=self.config.max_retries,
+                base_url=self.config.base_url,
+            )
+        return self._client
 
-    def generate_prompt(self, *, paragraph_id: int, paragraph_text: str) -> str:
+    def generate_prompt(
+        self, *, paragraph_id: int, paragraph_text: str
+    ) -> PromptResult:
         model = self.config.model
         instructions = DEFAULT_INSTRUCTIONS
         input_text = build_input(
@@ -51,23 +68,10 @@ class OpenAIClient:
         )
         temperature = self.config.temperature
         max_output_tokens = self.config.max_output_tokens
+        timestamp = datetime.now(timezone.utc).isoformat()
 
         if self.config.api_mode == "chat":
-            if self._chat_create is not None:
-                text = self._chat_create(
-                    model=model,
-                    instructions=instructions,
-                    input_text=input_text,
-                    temperature=temperature,
-                    max_output_tokens=max_output_tokens,
-                )
-                return self.normalize(text)
-
-            client = OpenAI(
-                timeout=self.config.timeout_seconds,
-                max_retries=self.config.max_retries,
-                base_url=self.config.base_url,
-            )
+            client = self._get_client()
             response = client.chat.completions.create(
                 model=model,
                 temperature=temperature,
@@ -78,38 +82,35 @@ class OpenAIClient:
                 ],
             )
             content = response.choices[0].message.content or ""
-            return self.normalize(content)
+            response_id = response.id
+            return PromptResult(
+                prompt=self._normalize(content),
+                model=model,
+                response_id=response_id,
+                timestamp=timestamp,
+            )
 
-        if self._responses_create is not None:
-            response = self._responses_create(
-                model=model,
-                instructions=instructions,
-                input=input_text,
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-                store=self.config.store,
-                stream=False,
-            )
-        else:
-            client = OpenAI(
-                timeout=self.config.timeout_seconds,
-                max_retries=self.config.max_retries,
-                base_url=self.config.base_url,
-            )
-            response = client.responses.create(
-                model=model,
-                instructions=instructions,
-                input=input_text,
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-                store=self.config.store,
-                stream=False,
-            )
+        client = self._get_client()
+        response = client.responses.create(
+            model=model,
+            instructions=instructions,
+            input=input_text,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            store=self.config.store,
+            stream=False,
+        )
 
         output_text = getattr(response, "output_text", "")
-        return self.normalize(output_text)
+        response_id = getattr(response, "id", "")
+        return PromptResult(
+            prompt=self._normalize(output_text),
+            model=model,
+            response_id=response_id,
+            timestamp=timestamp,
+        )
 
-    def normalize(self, text: str) -> str:
+    def _normalize(self, text: str) -> str:
         if not text.strip():
             raise ValueError("Empty model output")
         return normalize_prompt(text)
