@@ -103,7 +103,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Enable OpenAI response storage (default: false).",
     )
     _ = parser.add_argument("--temperature", type=float, default=0.3)
-    _ = parser.add_argument("--max-output-tokens", type=int, default=300)
+    _ = parser.add_argument("--max-output-tokens", type=int, default=800)
 
     _ = parser.add_argument(
         "--start",
