@@ -8,5 +8,6 @@ def test_default_instructions_is_single_line() -> None:
 
 def test_build_input_includes_id_and_text() -> None:
     assert (
-        build_input(paragraph_id=12, paragraph_text=" hello ") == "Paragraph 12: hello"
+        build_input(paragraph_id=12, paragraph_text=" hello ")
+        == "Paragraph ID: 12\nContent:\n<narrative_text>\nhello\n</narrative_text>"
     )

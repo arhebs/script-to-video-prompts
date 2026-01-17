@@ -33,7 +33,9 @@ class PromptResult:
 DEFAULT_INSTRUCTIONS = (
     "You are a film director, anthropologist, and visual historian creating "
     "cinematic video prompts for Google Veo 3 (fast mode). "
+    "The narrative text to process is enclosed in <narrative_text> tags. "
     "Generate exactly 1 prompt in English from the provided paragraph. "
+    "Start immediately with the prompt; do not output conversational filler like 'Here is the prompt:'. "
     "Return exactly one prompt as a single block of text (no bullets, no line breaks). "
     "Do not include captions, on-screen text, watermarks, or logos."
 )
@@ -41,7 +43,13 @@ DEFAULT_INSTRUCTIONS = (
 
 def build_input(*, paragraph_id: int, paragraph_text: str) -> str:
     paragraph_text = paragraph_text.strip()
-    return f"Paragraph {paragraph_id}: {paragraph_text}"
+    return (
+        f"Paragraph ID: {paragraph_id}\n"
+        "Content:\n"
+        "<narrative_text>\n"
+        f"{paragraph_text}\n"
+        "</narrative_text>"
+    )
 
 
 @dataclass(slots=True)
