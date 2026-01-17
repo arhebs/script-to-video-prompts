@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol, cast
 
 from openai import OpenAI
 
@@ -14,6 +14,9 @@ class OpenAIClientConfig:
     temperature: float = 0.3
     max_output_tokens: int = 300
     store: bool = False
+
+    base_url: str | None = None
+    api_mode: str = "responses"
 
     timeout_seconds: float = 60.0
     max_retries: int = 5
@@ -33,56 +36,80 @@ def build_input(*, paragraph_id: int, paragraph_text: str) -> str:
     return f"Paragraph {paragraph_id}: {paragraph_text}"
 
 
-class _ResponseWithText(Protocol):
-    @property
-    def output_text(self) -> str: ...
-
-
-class _ResponsesCreateFn(Protocol):
-    def __call__(
-        self,
-        *,
-        model: str,
-        instructions: str,
-        input: str,
-        temperature: float,
-        max_output_tokens: int,
-        store: bool,
-        stream: bool,
-    ) -> _ResponseWithText: ...
-
-
 @dataclass(frozen=True, slots=True)
 class OpenAIClient:
     config: OpenAIClientConfig
-    _responses_create: _ResponsesCreateFn | None = None
+
+    _responses_create: Callable[..., object] | None = None
+    _chat_create: Callable[..., str] | None = None
 
     def generate_prompt(self, *, paragraph_id: int, paragraph_text: str) -> str:
-        payload = {
-            "model": self.config.model,
-            "instructions": DEFAULT_INSTRUCTIONS,
-            "input": build_input(
-                paragraph_id=paragraph_id, paragraph_text=paragraph_text
-            ),
-            "temperature": self.config.temperature,
-            "max_output_tokens": self.config.max_output_tokens,
-            "store": self.config.store,
-            "stream": False,
-        }
+        model = self.config.model
+        instructions = DEFAULT_INSTRUCTIONS
+        input_text = build_input(
+            paragraph_id=paragraph_id, paragraph_text=paragraph_text
+        )
+        temperature = self.config.temperature
+        max_output_tokens = self.config.max_output_tokens
+
+        if self.config.api_mode == "chat":
+            if self._chat_create is not None:
+                text = self._chat_create(
+                    model=model,
+                    instructions=instructions,
+                    input_text=input_text,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                )
+                return self.normalize(text)
+
+            client = OpenAI(
+                timeout=self.config.timeout_seconds,
+                max_retries=self.config.max_retries,
+                base_url=self.config.base_url,
+            )
+            response = client.chat.completions.create(
+                model=model,
+                temperature=temperature,
+                max_tokens=max_output_tokens,
+                messages=[
+                    {"role": "system", "content": instructions},
+                    {"role": "user", "content": input_text},
+                ],
+            )
+            content = response.choices[0].message.content or ""
+            return self.normalize(content)
 
         if self._responses_create is not None:
-            response = self._responses_create(**payload)
+            response = self._responses_create(
+                model=model,
+                instructions=instructions,
+                input=input_text,
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+                store=self.config.store,
+                stream=False,
+            )
         else:
             client = OpenAI(
-                timeout=self.config.timeout_seconds, max_retries=self.config.max_retries
+                timeout=self.config.timeout_seconds,
+                max_retries=self.config.max_retries,
+                base_url=self.config.base_url,
             )
-            response = cast(_ResponseWithText, client.responses.create(**payload))
+            response = client.responses.create(
+                model=model,
+                instructions=instructions,
+                input=input_text,
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+                store=self.config.store,
+                stream=False,
+            )
 
-        output_text = response.output_text
-        if not output_text.strip():
-            raise ValueError(f"Empty model output for paragraph id {paragraph_id}")
-
+        output_text = getattr(response, "output_text", "")
         return self.normalize(output_text)
 
     def normalize(self, text: str) -> str:
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("Empty model output")
         return normalize_prompt(text)
