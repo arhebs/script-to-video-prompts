@@ -1,6 +1,7 @@
+import json
 from pathlib import Path
 
-from src.output import CsvWriterConfig, write_csv
+from src.output import CsvWriterConfig, write_csv, write_jsonl
 
 
 def test_write_csv_smoke(tmp_path: Path) -> None:
@@ -61,3 +62,43 @@ def test_write_tsv_uses_tab_delimiter(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert text.splitlines()[0] == "id\tparagraph\tprompt"
     assert "\t" in text
+
+
+def test_write_jsonl_one_object_per_line(tmp_path: Path) -> None:
+    out = tmp_path / "out.jsonl"
+
+    write_jsonl(
+        [{"id": "1", "paragraph": "p", "prompt": "q"}],
+        out,
+        append=False,
+        encoding="utf-8",
+    )
+
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    obj_raw: object = json.loads(lines[0])
+    if not isinstance(obj_raw, dict):
+        raise AssertionError("expected JSON object")
+    assert obj_raw == {"id": "1", "paragraph": "p", "prompt": "q"}
+
+
+def test_write_jsonl_appends(tmp_path: Path) -> None:
+    out = tmp_path / "out.jsonl"
+
+    write_jsonl(
+        [{"id": "1", "paragraph": "p1", "prompt": "q1"}],
+        out,
+        append=False,
+        encoding="utf-8",
+    )
+    write_jsonl(
+        [{"id": "2", "paragraph": "p2", "prompt": "q2"}],
+        out,
+        append=True,
+        encoding="utf-8",
+    )
+
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0])["id"] == "1"
+    assert json.loads(lines[1])["id"] == "2"
