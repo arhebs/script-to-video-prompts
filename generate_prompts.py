@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 from src.openai_client import OpenAIClient, OpenAIClientConfig
-from src.output import CsvWriterConfig, write_csv
+from src.output import CsvWriterConfig, write_csv, write_jsonl
 from src.parser import Paragraph, parse_numbered_paragraphs
 
 
@@ -80,6 +80,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="utf-8",
         help="Output encoding (e.g. utf-8-sig).",
     )
+    parser.add_argument(
+        "--jsonl",
+        default=None,
+        type=Path,
+        help="Optional JSONL output path (writes one JSON object per row).",
+    )
 
     return parser
 
@@ -137,6 +143,7 @@ def main() -> int:
     append: bool = args.append
     format_name: str = args.format
     encoding: str = args.encoding
+    jsonl_path: Path | None = args.jsonl
 
     try:
         text = input_path.read_text(encoding="utf-8")
@@ -169,6 +176,9 @@ def main() -> int:
             output_path,
             CsvWriterConfig(append=append, encoding=encoding, delimiter=delimiter),
         )
+
+        if jsonl_path is not None:
+            write_jsonl(rows, jsonl_path, append=append, encoding=encoding)
 
         return 0
     except Exception as e:
